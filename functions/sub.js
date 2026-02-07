@@ -5,10 +5,10 @@ export async function onRequest(request) {
   const url = new URL(request.url);
   
   // 从环境变量获取后端地址，如果没有则使用默认值
-  const backendUrl = url.searchParams.get('backend') || 'https://url.v1.mk';
+  const backendUrl = 'https://url.v1.mk';
   
   // 构建后端请求 URL
-  const backendPath = url.pathname.replace(/\/sub/, '/sub') + url.search;
+  const backendPath = url.pathname + url.search;
   
   try {
     const response = await fetch(backendUrl + backendPath, {
@@ -20,7 +20,10 @@ export async function onRequest(request) {
       }
     });
 
-    const responseHeaders = new Headers(response.headers);
+    const responseHeaders = new Headers();
+    for (const [key, value] of response.headers.entries()) {
+      responseHeaders.set(key, value);
+    }
     responseHeaders.set('Access-Control-Allow-Origin', '*');
     responseHeaders.set('Cache-Control', 'no-store, no-cache, must-revalidate');
 
