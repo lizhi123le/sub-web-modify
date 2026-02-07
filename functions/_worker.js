@@ -19,9 +19,17 @@ async function handleVersion(request, env) {
       }
     });
     if (response.ok) {
-      backendVersion = await response.json();
-    } else {
-      backendError = "HTTP " + response.status;
+      // 尝试解析 JSON，如果失败则使用纯文本
+      var contentType = response.headers.get("content-type") || "";
+      if (contentType.includes("application/json")) {
+        try {
+          backendVersion = await response.json();
+        } catch (e) {
+          backendVersion = await response.text();
+        }
+      } else {
+        backendVersion = await response.text();
+      }
     }
   } catch (error) {
     backendError = error.message;
