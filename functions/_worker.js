@@ -1,4 +1,5 @@
 // Cloudflare Pages Functions - Version API
+// 直接返回后端版本信息
 
 async function onRequest(request) {
   var backendApi = "https://url.v1.mk";
