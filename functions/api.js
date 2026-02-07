@@ -1,4 +1,4 @@
-// Cloudflare Pages Functions - Sub API Proxy
+// Cloudflare Pages Functions - API Proxy
 export async function onRequest(request) {
   var url = new URL(request.url);
   var backendUrl = "https://url.v1.mk";
