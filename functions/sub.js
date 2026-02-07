@@ -1,44 +1,25 @@
 // Cloudflare Pages Functions - Sub API Proxy
-// 代理 /sub 请求到后端 API
-
 export async function onRequest(request) {
-  const url = new URL(request.url);
+  var url = new URL(request.url);
+  var backendUrl = "https://url.v1.mk";
+  var backendPath = url.pathname + url.search;
   
-  // 从环境变量获取后端地址，如果没有则使用默认值
-  const backendUrl = 'https://url.v1.mk';
-  
-  // 构建后端请求 URL
-  const backendPath = url.pathname + url.search;
-  
-  try {
-    const response = await fetch(backendUrl + backendPath, {
-      method: request.method,
-      headers: {
-        'User-Agent': 'Sub-Web-Modify/1.0',
-        'Accept': request.headers.get('Accept') || '*/*',
-        'Referer': url.origin
-      }
-    });
-
-    const responseHeaders = new Headers();
-    for (const [key, value] of response.headers.entries()) {
-      responseHeaders.set(key, value);
+  var response = await fetch(backendUrl + backendPath, {
+    method: request.method,
+    headers: {
+      "User-Agent": "Sub-Web-Modify/1.0"
     }
-    responseHeaders.set('Access-Control-Allow-Origin', '*');
-    responseHeaders.set('Cache-Control', 'no-store, no-cache, must-revalidate');
-
-    return new Response(response.body, {
-      status: response.status,
-      statusText: response.statusText,
-      headers: responseHeaders
-    });
-  } catch (error) {
-    return new Response(JSON.stringify({ error: 'Backend request failed', message: error.message }), {
-      status: 502,
-      headers: {
-        'Content-Type': 'application/json; charset=utf-8',
-        'Access-Control-Allow-Origin': '*'
-      }
-    });
+  });
+  
+  var responseHeaders = new Headers();
+  for (var pair of response.headers.entries()) {
+    responseHeaders.set(pair[0], pair[1]);
   }
+  responseHeaders.set("Access-Control-Allow-Origin", "*");
+  
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: responseHeaders
+  });
 }
