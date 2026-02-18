@@ -13,6 +13,18 @@ module.exports = {
     }
   },
 
+  devServer: {
+    port: 8080,
+    proxy: {
+      '/sub': {
+        target: process.env.BACKEND_API_URL || process.env.VUE_APP_SUBCONVERTER_DEFAULT_BACKEND || 'https://url.v1.mk',
+        changeOrigin: true,
+        secure: true,
+        ws: true
+      }
+    }
+  },
+
   chainWebpack: config => {
     // set svg-sprite-loader
     config.module
