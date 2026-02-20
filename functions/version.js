@@ -1,21 +1,46 @@
 // Cloudflare Pages Functions - Version API
 
 export async function onRequest(request) {
-  var backendApi = "https://url.v1.mk";
-  var backendVersionUrl = backendApi + "/version";
-
-  var version = "unknown";
-
+  const BACKEND_API_URL = process.env.BACKEND_API_URL || "https://url.v1.mk";
+  
   try {
-    var response = await fetch(backendVersionUrl);
+    const response = await fetch(`${BACKEND_API_URL}/version`, { 
+      signal: AbortSignal.timeout(5000) 
+    });
+    
     if (response.ok) {
-      version = await response.text();
+      const version = await response.text();
+      return new Response(version, {
+        status: 200,
+        headers: { 
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*"
+        }
+      });
+    } else {
+      return new Response(JSON.stringify({ 
+        error: 'Backend error', 
+        message: `HTTP ${response.status}`,
+        backend: BACKEND_API_URL 
+      }), {
+        status: response.status,
+        headers: { 
+          "Content-Type": "application/json",
+          "Access-Control-Allow-Origin": "*"
+        }
+      });
     }
   } catch (e) {
-    version = "Error: " + e.message;
+    return new Response(JSON.stringify({ 
+      error: 'Backend unavailable', 
+      message: e.message,
+      backend: BACKEND_API_URL 
+    }), {
+      status: 503,
+      headers: { 
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*"
+      }
+    });
   }
-
-  return new Response(version, {
-    headers: { "Content-Type": "text/plain; charset=utf-8" }
-  });
 }

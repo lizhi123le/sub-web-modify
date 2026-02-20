@@ -30,20 +30,39 @@ Sub-Web-Modify 是基于 [CareyWang/sub-web](https://github.com/CareyWang/sub-we
 ### 方式一：Cloudflare Pages 部署（推荐）
 
 1. **Fork 本仓库** 到你的 GitHub 账户
-2. **修改配置文件**：
-   - 编辑 `src\views\Subconverter.vue` - 配置默认后端地址
-   - 编辑 `.env` - 设置环境变量
-3. **连接到 Cloudflare Pages**：
+2. **连接到 Cloudflare Pages**：
    - 登录 [Cloudflare Dashboard](https://dash.cloudflare.com/)
    - 进入 Pages → 创建项目 → 连接到 Git
    - 选择你 Fork 的仓库
-4. **配置构建设置**：
+3. **配置构建设置**：
    ```
    框架预设：Vue
    构建命令：npm run build
    构建输出目录：/dist
    ```
+4. **配置环境变量和 KV 绑定**（见下方详细说明）
 5. **部署完成** - 自动部署，每次推送代码都会自动更新
+
+#### Cloudflare 后台配置
+
+**环境变量设置**：
+- 进入 **Settings** → **Environment variables**
+- 添加变量：
+  | Variable | Value |
+  |----------|-------|
+  | `BACKEND_API_URL` | `https://url.v1.mk`（或你自己的后端地址） |
+
+**KV 命名空间绑定**（可选，用于订阅缓存）：
+- 进入 **Settings** → **Functions** → **KV namespace bindings**
+- 添加绑定：
+  | Variable | KV Namespace |
+  |----------|--------------|
+  | `SUBSCRIPTION_CACHE` | 选择已创建的 KV 命名空间 |
+
+如需创建 KV，在终端执行：
+```bash
+wrangler kv:namespace create SUBSCRIPTION_CACHE
+```
 
 ### 方式二：EdgeOne Pages 部署
 
@@ -67,13 +86,15 @@ Sub-Web-Modify 是基于 [CareyWang/sub-web](https://github.com/CareyWang/sub-we
 
 ## 🔧 配置说明
 
-部署前需要修改以下两个文件：
+### 前端配置（可选）
 
-### 1. src\views\Subconverter.vue
+如需修改默认后端地址，可编辑以下文件：
+
+#### 1. src\views\Subconverter.vue
 修改默认后端地址和相关配置
 
-### 2. .env
-设置环境变量：
+#### 2. .env
+设置前端环境变量：
 ```env
 # 默认后端地址
 VUE_APP_SUBCONVERTER_DEFAULT_BACKEND=https://your-backend-url.com
@@ -83,6 +104,16 @@ VUE_APP_MYURLS_DEFAULT_BACKEND=https://your-short-url-service.com
 
 # 其他配置...
 ```
+
+### 后端 API 配置（必填）
+
+部署到 Cloudflare Pages 后，必须在后台设置：
+
+| 变量名 | 说明 | 示例值 |
+|--------|------|--------|
+| `BACKEND_API_URL` | 后端 API 地址 | `https://url.v1.mk` |
+
+**设置位置**：Settings → Environment variables
 
 ## 📋 支持的客户端
 

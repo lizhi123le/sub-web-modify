@@ -21,6 +21,12 @@ module.exports = {
         changeOrigin: true,
         secure: true,
         ws: true
+      },
+      '/version': {
+        target: process.env.BACKEND_API_URL || process.env.VUE_APP_SUBCONVERTER_DEFAULT_BACKEND || 'https://url.v1.mk',
+        changeOrigin: true,
+        secure: true,
+        ws: true
       }
     }
   },
