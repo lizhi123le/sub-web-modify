@@ -52,18 +52,6 @@ Sub-Web-Modify 是基于 [CareyWang/sub-web](https://github.com/CareyWang/sub-we
   |----------|-------|
   | `BACKEND_API_URL` | `https://url.v1.mk`（或你自己的后端地址） |
 
-**KV 命名空间绑定**（可选，用于订阅缓存）：
-- 进入 **Settings** → **Functions** → **KV namespace bindings**
-- 添加绑定：
-  | Variable | KV Namespace |
-  |----------|--------------|
-  | `SUBSCRIPTION_CACHE` | 选择已创建的 KV 命名空间 |
-
-如需创建 KV，在终端执行：
-```bash
-wrangler kv:namespace create SUBSCRIPTION_CACHE
-```
-
 ### 方式二：EdgeOne Pages 部署
 
 1. **Fork 本仓库** 到你的 GitHub 账户
