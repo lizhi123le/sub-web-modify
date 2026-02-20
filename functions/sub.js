@@ -3,8 +3,8 @@
 // 需要绑定 KV 命名空间: SUBSCRIPTION_CACHE
 // 环境变量: BACKEND_API_URL
 
-// 环境变量配置
-const BACKEND = process.env.BACKEND_API_URL || "https://url.v1.mk";
+// 环境变量配置 (使用默认值，避免未设置时报错)
+const DEFAULT_BACKEND = "https://url.v1.mk";
 const CACHE_TTL = 3600; // 缓存时间 1 小时
 
 // 生成随机字符串
@@ -150,6 +150,9 @@ export async function onRequest(context) {
   const url = new URL(request.url);
   const host = getHost(request);
   const pathParts = url.pathname.split("/").filter(p => p);
+  
+  // 获取后端地址 (兼容未绑定环境变量的情况)
+  const BACKEND = env.BACKEND_API_URL || DEFAULT_BACKEND;
   
   // 获取缓存存储
   const cache = getCacheStorage(env);

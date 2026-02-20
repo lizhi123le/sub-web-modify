@@ -1,7 +1,7 @@
 // Cloudflare Pages Functions - Version API
 
-export async function onRequest(request) {
-  const BACKEND_API_URL = process.env.BACKEND_API_URL || "https://url.v1.mk";
+export async function onRequest(context) {
+  const BACKEND_API_URL = context.env.BACKEND_API_URL || "https://url.v1.mk";
   
   try {
     const response = await fetch(`${BACKEND_API_URL}/version`, { 
