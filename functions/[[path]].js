@@ -194,59 +194,13 @@ export async function onRequest(context) {
   const env = context.env;
   const url = new URL(request.url);
   
-  // 获取后端地址
-  const BACKEND = env.BACKEND_API_URL || DEFAULT_BACKEND;
-  
-  // 根路径 - 返回简单说明
-  if (url.pathname === "/" || url.pathname === "") {
-    return new Response(`<!DOCTYPE html>
-<html>
-<head><title>sub-web-modify</title></head>
-<body>
-<h1>Sub Web Modify - API Proxy</h1>
-<p>Backend: ${BACKEND}</p>
-<p>Use: /sub?url=YOUR_SUBSCRIPTION_URL</p>
-<p>Version: /version</p>
-</body>
-</html>`, {
-      headers: { "Content-Type": "text/html; charset=utf-8" }
-    });
-  }
-  
-  // 版本端点
-  if (url.pathname === "/version") {
-    return await handleVersionRequest(BACKEND);
-  }
-  
-  // 内部临时订阅端点 (必须放在 /sub 之前以防止逻辑重叠)
-  if (url.pathname.includes("/internal/")) {
-    const pathSegments = url.pathname.split("/").filter(s => s);
-    const key = pathSegments[pathSegments.length - 1];
-    const SUB_CACHE = env.SUB_CACHE || new Map();
-    const isKV = typeof SUB_CACHE.get === 'function' && SUB_CACHE.constructor.name !== 'Map';
-    
-    let content, headersJson;
-    if (isKV) {
-      content = await SUB_CACHE.get(key);
-      headersJson = await SUB_CACHE.get(key + "_headers");
-    } else {
-      content = SUB_CACHE.get(key);
-      headersJson = SUB_CACHE.get(key + "_headers");
-    }
-
-    if (!content) return new Response("Not Found", { status: 404 });
-
-    const headers = new Headers(headersJson ? JSON.parse(headersJson) : { "Content-Type": "text/plain; charset=utf-8", "Access-Control-Allow-Origin": "*" });
-    headers.set("Access-Control-Allow-Origin", "*");
-    return new Response(content, { headers });
-  }
-
   // 订阅转换端点 (/sub)
   if (url.pathname === "/sub" || url.pathname.startsWith("/sub")) {
     return await handleSubRequest(request, url, BACKEND, env);
   }
   
-  return new Response("Not Found", { status: 404 });
+  // 其余请求（如首页、静态资源）则交给 Pages 静态服务器处理
+  return await context.next();
 }
 
 // --- Obfuscation Utilities ---
