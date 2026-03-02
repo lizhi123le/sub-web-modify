@@ -196,18 +196,8 @@ export async function onRequest(context) {
   
   // 获取后端地址
   const BACKEND = env.BACKEND_API_URL || DEFAULT_BACKEND;
-  
-  // 订阅转换端点 (/sub)
-  if (url.pathname === "/sub" || url.pathname.startsWith("/sub")) {
-    return await handleSubRequest(request, url, BACKEND, env);
-  }
 
-  // 版本端点
-  if (url.pathname === "/version") {
-    return await handleVersionRequest(BACKEND);
-  }
-  
-  // 内部临时订阅端点
+  // 内部临时订阅端点 (必须最先判断，防止被 /sub 拦截)
   if (url.pathname.includes("/internal/")) {
     const pathSegments = url.pathname.split("/").filter(s => s);
     const key = pathSegments[pathSegments.length - 1];
@@ -228,6 +218,16 @@ export async function onRequest(context) {
     const headers = new Headers(headersJson ? JSON.parse(headersJson) : { "Content-Type": "text/plain; charset=utf-8", "Access-Control-Allow-Origin": "*" });
     headers.set("Access-Control-Allow-Origin", "*");
     return new Response(content, { headers });
+  }
+  
+  // 订阅转换端点 (/sub)
+  if (url.pathname === "/sub" || url.pathname.startsWith("/sub")) {
+    return await handleSubRequest(request, url, BACKEND, env);
+  }
+
+  // 版本端点
+  if (url.pathname === "/version") {
+    return await handleVersionRequest(BACKEND);
   }
   
   // 其余请求（如首页、静态资源）则交给 Pages 静态服务器处理
