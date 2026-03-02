@@ -13,7 +13,7 @@ async function handleSubRequest(request, url, backend, env) {
   }
 
   const host = url.origin;
-  const subInternalDir = "sub-internal";
+  const subInternalDir = "sub/internal";
   const replacements = {};
   const replacedURIs = [];
   const keys = [];
@@ -100,13 +100,15 @@ async function handleSubRequest(request, url, backend, env) {
   const originalParams = new URL(request.url).searchParams;
   originalParams.set("url", newUrl);
   
-  const backendUrl = backend + "/sub?" + originalParams.toString();
+  // 确保 backend 是 origin
+  const backendBase = backend.replace(/(https?:\/\/[^/]+).*$/, "$1");
+  const backendUrl = backendBase + "/sub?" + originalParams.toString();
   
   try {
     const response = await fetch(backendUrl, {
       method: "GET",
       headers: {
-        "User-Agent": request.headers.get("User-Agent") || "Mozilla/5.0",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
       }
     });
     
@@ -206,13 +208,8 @@ export async function onRequest(context) {
     return await handleVersionRequest(BACKEND);
   }
   
-  // 订阅转换端点 (/sub)
-  if (url.pathname === "/sub" || url.pathname.startsWith("/sub")) {
-    return await handleSubRequest(request, url, BACKEND, env);
-  }
-
-  // 内部临时订阅端点
-  if (url.pathname.startsWith("/sub-internal/")) {
+  // 内部临时订阅端点 (必须放在 /sub 之前以防止逻辑重叠)
+  if (url.pathname.includes("/internal/")) {
     const pathSegments = url.pathname.split("/").filter(s => s);
     const key = pathSegments[pathSegments.length - 1];
     const SUB_CACHE = env.SUB_CACHE || new Map();
@@ -229,8 +226,14 @@ export async function onRequest(context) {
 
     if (!content) return new Response("Not Found", { status: 404 });
 
-    const headers = new Headers(headersJson ? JSON.parse(headersJson) : { "Content-Type": "text/plain; charset=utf-8" });
+    const headers = new Headers(headersJson ? JSON.parse(headersJson) : { "Content-Type": "text/plain; charset=utf-8", "Access-Control-Allow-Origin": "*" });
+    headers.set("Access-Control-Allow-Origin", "*");
     return new Response(content, { headers });
+  }
+
+  // 订阅转换端点 (/sub)
+  if (url.pathname === "/sub" || url.pathname.startsWith("/sub")) {
+    return await handleSubRequest(request, url, BACKEND, env);
   }
   
   return new Response("Not Found", { status: 404 });
@@ -266,13 +269,22 @@ function urlSafeBase64Encode(input) {
 function urlSafeBase64Decode(input) {
   try {
     const padded = input + "=".repeat((4 - (input.length % 4)) % 4);
-    return atob(padded.replace(/-/g, "+").replace(/_/g, "/"));
+    const base64 = padded.replace(/-/g, "+").replace(/_/g, "/");
+    return base64ToUtf8(base64);
   } catch (e) {
     try {
-      return atob(input);
+      return base64ToUtf8(input);
     } catch (e2) {
       return input;
     }
+  }
+}
+
+function base64ToUtf8(str) {
+  try {
+    return decodeURIComponent(escape(atob(str)));
+  } catch (e) {
+    return atob(str);
   }
 }
 
