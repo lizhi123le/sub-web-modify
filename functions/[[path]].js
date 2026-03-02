@@ -121,16 +121,26 @@ async function handleSubRequest(request, url, backend, env) {
         "g"
       );
       
-      // 尝试处理 base64 响应
+      const target = url.searchParams.get("target");
+      
       try {
+        // 先尝试 Base64 解码
         const decoded = urlSafeBase64Decode(content);
-        if (decoded.includes("://")) {
+        // 如果解码成功且包含特征字符 (或者原本就是 base64 响应)
+        if (decoded && (decoded.includes("://") || decoded.includes("proxies:") || decoded.includes("port:"))) {
           const recovered = decoded.replace(recoveryRegex, (match) => replacements[match] || match);
-          content = utf8ToBase64(recovered);
+          // 只有当明确要求 target=base64 时才重编码，否则返回明文
+          if (target === "base64") {
+            content = utf8ToBase64(recovered);
+          } else {
+            content = recovered;
+          }
         } else {
+          // 如果不是 base64，直接替换
           content = content.replace(recoveryRegex, (match) => replacements[match] || match);
         }
       } catch (e) {
+        // 解码失败则作为明文替换
         content = content.replace(recoveryRegex, (match) => replacements[match] || match);
       }
     }
@@ -140,9 +150,9 @@ async function handleSubRequest(request, url, backend, env) {
       for (const k of keys) await cacheDelete(k);
     }
     
-    const responseHeaders = new Headers(response.headers);
+    const responseHeaders = new Headers();
+    responseHeaders.set("Content-Type", "text/plain; charset=utf-8");
     responseHeaders.set("Access-Control-Allow-Origin", "*");
-    responseHeaders.delete("server");
     
     return new Response(content, {
       status: response.status,
