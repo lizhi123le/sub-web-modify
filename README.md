@@ -45,12 +45,23 @@ Sub-Web-Modify 是基于 [CareyWang/sub-web](https://github.com/CareyWang/sub-we
 
 #### Cloudflare 后台配置
 
-**环境变量设置**：
+**1. 环境变量设置**：
+
 - 进入 **Settings** → **Environment variables**
 - 添加变量：
-  | Variable | Value |
-  |----------|-------|
-  | `BACKEND_API_URL` | `https://url.v1.mk`（或你自己的后端地址） |
+  | Variable | Value | Description |
+  |----------|-------|-------------|
+  | `BACKEND_API_URL` | `https://url.v1.mk` | 后端 API 地址（必填） |
+
+**2. KV 绑定（可选，推荐）**：
+为了实现订阅节点的脱敏功能，建议绑定 KV 命名空间：
+
+- 进入 **Settings** → **Functions** → **KV namespace bindings**
+- 添加绑定：
+  - Variable name: `SUB_CACHE`
+  - KV namespace: 选择你创建的 KV 空间
+    > [!NOTE]
+    > 如果不绑定 KV，系统将回退到内存缓存，但在 Cloudflare Workers 环境下内存缓存不可靠，节点混淆功能可能会失效。
 
 ### 方式二：EdgeOne Pages 部署
 
@@ -79,10 +90,13 @@ Sub-Web-Modify 是基于 [CareyWang/sub-web](https://github.com/CareyWang/sub-we
 如需修改默认后端地址，可编辑以下文件：
 
 #### 1. src\views\Subconverter.vue
+
 修改默认后端地址和相关配置
 
 #### 2. .env
+
 设置前端环境变量：
+
 ```env
 # 默认后端地址
 VUE_APP_SUBCONVERTER_DEFAULT_BACKEND=https://your-backend-url.com
@@ -97,21 +111,22 @@ VUE_APP_MYURLS_DEFAULT_BACKEND=https://your-short-url-service.com
 
 部署到 Cloudflare Pages 后，必须在后台设置：
 
-| 变量名 | 说明 | 示例值 |
-|--------|------|--------|
-| `BACKEND_API_URL` | 后端 API 地址 | `https://url.v1.mk` |
+| 变量名            | 说明                       | 示例值              |
+| ----------------- | -------------------------- | ------------------- |
+| `BACKEND_API_URL` | 后端 API 地址              | `https://url.v1.mk` |
+| `SUB_CACHE`       | (KV 绑定) 用于存储混淆映射 | 绑定 KV 命名空间    |
 
-**设置位置**：Settings → Environment variables
+**设置位置**：Settings → Environment variables (变量) 和 Settings → Functions (KV 绑定)
 
 ## 📋 支持的客户端
 
-| 客户端 | 平台 | 状态 |
-|--------|------|------|
-| Clash | Windows/macOS/Linux | ✅ |
-| Surge | iOS/macOS | ✅ |
-| Quantumult X | iOS | ✅ |
-| V2Ray | 全平台 | ✅ |
-| Sing-Box | 全平台 | ✅ |
+| 客户端       | 平台                | 状态 |
+| ------------ | ------------------- | ---- |
+| Clash        | Windows/macOS/Linux | ✅   |
+| Surge        | iOS/macOS           | ✅   |
+| Quantumult X | iOS                 | ✅   |
+| V2Ray        | 全平台              | ✅   |
+| Sing-Box     | 全平台              | ✅   |
 
 ## 🛠️ 主要功能
 
@@ -140,4 +155,3 @@ VUE_APP_MYURLS_DEFAULT_BACKEND=https://your-short-url-service.com
 - 特别感谢原作者 [youshandefeiyang](https://github.com/youshandefeiyang) 的杰出贡献
 - 感谢 [CareyWang/sub-web](https://github.com/CareyWang/sub-web) 提供的原始项目基础
 - 感谢所有贡献者的辛勤付出
-
