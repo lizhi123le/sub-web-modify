@@ -35,7 +35,6 @@ function utf8ToBase64(str) {
   try {
     return btoa(unescape(encodeURIComponent(str))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   } catch (e) {
-    // fallback for environments where unescape/encodeURIComponent behave differently
     return btoa(str).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
   }
 }
@@ -90,14 +89,12 @@ function normalizeServer(server) {
   return server;
 }
 
-// Generic host regex with named groups: matches [ipv6], ipv6, ipv4, or hostname
-const HOST_RE = /(?:\[(?<ipv6_br>[\da-fA-F:]+)\]|(?<ipv6>[\da-fA-F:]+)|(?<ipv4>[\d.]+)|(?<host>[\w.-]+))/u;
-
-// Extract bare host from a regex match result (supports named groups)
-function extractHostFromMatch(match) {
-  if (!match) return null;
-  const groups = match.groups || {};
-  return groups.ipv6 || groups.ipv6_br || groups.ipv4 || groups.host || null;
+// Helper: from an array of capture groups, return first non-empty (compat for non-named groups)
+function firstNonEmpty(...groups) {
+  for (const g of groups) {
+    if (typeof g === "string" && g.length > 0) return g;
+  }
+  return null;
 }
 
 // --- Obfuscation helpers (keeps same semantics as previous implementation) ---
@@ -117,9 +114,10 @@ function replaceSS(link, replacements, isRecovery) {
   const randomDomain = randomPassword + ".com";
   let tempLink = link.slice(5).split("#")[0];
   if (tempLink.includes("@")) {
-    const match = tempLink.match(/(\S+?)@(\[?[\da-fA-F:]+\]?|[\d\.]+|[\w\.-]+):/);
+    const match = tempLink.match(/(\S+?)@((?:\[[\da-fA-F:]+\])|(?:[\da-fA-F:]+)|(?:[\d.]+)|(?:[\w\.-]+)):/);
     if (!match) return link;
-    const [full, base64Data, serverRaw] = match;
+    const base64Data = match[1];
+    const serverRaw = match[2];
     try {
       const decoded = urlSafeBase64Decode(base64Data);
       const parts = decoded.split(":");
@@ -157,17 +155,18 @@ function replaceVmess(link, replacements, isRecovery) {
 }
 
 function replaceTrojan(link, replacements, isRecovery) {
-  const re = /(vless|trojan):\/\/(.*?)@(?:\[(?<ipv6_br>[\da-fA-F:]+)\]|(?<ipv6>[\da-fA-F:]+)|(?<ipv4>[\d.]+)|(?<host>[\w\.-]+)):/u;
+  // capture: proto, uuid, host (host may be [ipv6] or ipv6 or ipv4 or hostname)
+  const re = /(vless|trojan):\/\/(.*?)@((?:\[[\da-fA-F:]+\])|(?:[\da-fA-F:]+)|(?:[\d.]+)|(?:[\w\.-]+)):/;
   const match = link.match(re);
   if (!match) return link;
-  const server = extractHostFromMatch(match);
-  const rawHostMatch = match[0].match(HOST_RE);
-  const rawHost = rawHostMatch ? rawHostMatch[0] : null;
+  const proto = match[1];
   const uuid = match[2];
+  const rawHost = match[3]; // may include brackets
+  const server = normalizeServer(rawHost);
 
   if (isRecovery) {
     const original = replacements[server];
-    return original && rawHost ? link.replace(rawHost, original) : link;
+    return original ? link.replace(rawHost, original) : link;
   } else {
     const randomDomain = generateRandomStr(10) + ".com";
     const randomUUID = generateRandomUUID();
@@ -181,7 +180,7 @@ function replaceSSR(link, replacements, isRecovery) {
   try {
     let data = link.slice(6).replace("\r", "").split("#")[0];
     let decoded = urlSafeBase64Decode(data);
-    const match = decoded.match(/([\[\]\da-fA-F:\.]+|[\w\.-]+):(\d+?):(\S+?):(\S+?):(\S+?):(\S+)\//);
+    const match = decoded.match(/((?:\[[\da-fA-F:]+\])|(?:[\da-fA-F:]+)|(?:[\w\.-]+)):(\d+?):(\S+?):(\S+?):(\S+?):(\S+)\//);
     if (!match) return link;
     const serverRaw = match[1];
     const server = normalizeServer(serverRaw);
@@ -223,20 +222,20 @@ function replaceSocks(link, replacements, isRecovery) {
       const serverPort = temp.slice(atIndex + 1);
       const auth = atob(authBase64);
       const [user, pass] = auth.split(":");
-      const serverMatch = serverPort.match(/^((?:\[(?:[\da-fA-F:]+)\]|[\da-fA-F:]+|[\d.]+|[\w\.-]+)):(\d+)$/u);
+      const serverMatch = serverPort.match(/^(((?:\[[\da-fA-F:]+\])|(?:[\da-fA-F:]+)|(?:[\d.]+)|(?:[\w\.-]+))):(\d+)$/);
       if (!serverMatch) return link;
       const serverRaw = serverMatch[1];
       const server = normalizeServer(serverRaw);
-      const port = serverMatch[2];
+      const port = serverMatch[3];
       replacements[fakeIP] = server;
       if (pass) replacements[randomPass] = pass;
       return `socks://${utf8ToBase64(user + ":" + randomPass)}@${fakeIP}:${port}${hashPart}`;
     } else {
-      const serverMatch = temp.match(/^((?:\[(?:[\da-fA-F:]+)\]|[\da-fA-F:]+|[\d.]+|[\w\.-]+)):(\d+)$/u);
+      const serverMatch = temp.match(/^(((?:\[[\da-fA-F:]+\])|(?:[\da-fA-F:]+)|(?:[\d.]+)|(?:[\w\.-]+))):(\d+)$/);
       if (!serverMatch) return link;
       const serverRaw = serverMatch[1];
       const server = normalizeServer(serverRaw);
-      const port = serverMatch[2];
+      const port = serverMatch[3];
       replacements[fakeIP] = server;
       return `socks://${fakeIP}:${port}${hashPart}`;
     }
@@ -244,16 +243,15 @@ function replaceSocks(link, replacements, isRecovery) {
 }
 
 function replaceHysteria(link, replacements, isRecovery) {
-  const re = /hysteria:\/\/(?:\[(?<ipv6_br>[\da-fA-F:]+)\]|(?<ipv6>[\da-fA-F:]+)|(?<ipv4>[\d.]+)|(?<host>[\w\.-]+)):/u;
+  const re = /hysteria:\/\/(((?:\[[\da-fA-F:]+\])|(?:[\da-fA-F:]+)|(?:[\d.]+)|(?:[\w\.-]+))):/;
   const match = link.match(re);
   if (!match) return link;
-  const server = extractHostFromMatch(match);
-  const rawHostMatch = match[0].match(HOST_RE);
-  const rawHost = rawHostMatch ? rawHostMatch[0] : null;
+  const rawHost = match[1];
+  const server = normalizeServer(rawHost);
 
   if (isRecovery) {
     const original = replacements[server];
-    return original && rawHost ? link.replace(rawHost, original) : link;
+    return original ? link.replace(rawHost, original) : link;
   } else {
     const randomDomain = generateRandomStr(12) + ".com";
     replacements[randomDomain] = server;
@@ -262,17 +260,16 @@ function replaceHysteria(link, replacements, isRecovery) {
 }
 
 function replaceHysteria2(link, replacements, isRecovery) {
-  const re = /(hysteria2):\/\/(.*)@(?:\[(?<ipv6_br>[\da-fA-F:]+)\]|(?<ipv6>[\da-fA-F:]+)|(?<ipv4>[\d.]+)|(?<host>[\w\.-]+)):/u;
+  const re = /(hysteria2):\/\/(.*)@(((?:\[[\da-fA-F:]+\])|(?:[\da-fA-F:]+)|(?:[\d.]+)|(?:[\w\.-]+))):/;
   const match = link.match(re);
   if (!match) return link;
   const uuid = match[2];
-  const server = extractHostFromMatch(match);
-  const rawHostMatch = match[0].match(HOST_RE);
-  const rawHost = rawHostMatch ? rawHostMatch[0] : null;
+  const rawHost = match[3];
+  const server = normalizeServer(rawHost);
 
   if (isRecovery) {
     const original = replacements[server];
-    return original && rawHost ? link.replace(rawHost, original) : link;
+    return original ? link.replace(rawHost, original) : link;
   } else {
     const randomDomain = generateRandomStr(10) + ".com";
     const randomUUID = generateRandomUUID();
@@ -284,11 +281,10 @@ function replaceHysteria2(link, replacements, isRecovery) {
 
 function replaceYAMLContent(content, replacements) {
   let result = content;
-  const serverRegex = /server:\s*(?:\[(?<ipv6_br>[\da-fA-F:]+)\]|(?<ipv6>[\da-fA-F:]+)|(?<ipv4>[\d.]+)|(?<host>[\w.-]+))/gu;
-  result = result.replace(serverRegex, (match, ...args) => {
-    const groups = args[args.length - 1] || {};
-    const server = groups.ipv6 || groups.ipv6_br || groups.ipv4 || groups.host;
-    const normalized = normalizeServer(server);
+  const serverRegex = /server:\s*(((?:\[[\da-fA-F:]+\])|(?:[\da-fA-F:]+)|(?:[\d.]+)|(?:[\w\.-]+)))/gu;
+  result = result.replace(serverRegex, (match, p1) => {
+    const serverRaw = p1;
+    const normalized = normalizeServer(serverRaw);
     if (normalized && (normalized.includes(".") || normalized.includes(":"))) {
        const randomDomain = generateRandomStr(12) + ".com";
        replacements[randomDomain] = normalized;
@@ -313,14 +309,12 @@ function replaceYAMLContent(content, replacements) {
 
 // --- Module-scope KV helpers that use moduleLocalCache as short-term cache ---
 async function cachePut(env, key, value, headers) {
-  // store in KV if bound, otherwise store in moduleLocalCache
   if (isKVBinding(env.SUB_CACHE)) {
     try {
       await env.SUB_CACHE.put(key, value);
       if (headers) await env.SUB_CACHE.put(key + "_headers", JSON.stringify(headers));
     } catch (e) {
       console.error("KV put error", e);
-      // fallback to module cache
       moduleLocalCache.set(key, value);
       if (headers) moduleLocalCache.set(key + "_headers", JSON.stringify(headers));
     }
@@ -331,7 +325,6 @@ async function cachePut(env, key, value, headers) {
 }
 
 async function cacheGet(env, key) {
-  // check moduleLocalCache first
   if (moduleLocalCache.has(key)) return moduleLocalCache.get(key);
   if (isKVBinding(env.SUB_CACHE)) {
     try {
@@ -349,7 +342,6 @@ async function cacheGet(env, key) {
 }
 
 async function cacheDelete(env, key) {
-  // always attempt to delete from KV if bound, and always delete from moduleLocalCache
   if (isKVBinding(env.SUB_CACHE)) {
     try {
       await env.SUB_CACHE.delete(key);
@@ -358,9 +350,7 @@ async function cacheDelete(env, key) {
     }
     try {
       await env.SUB_CACHE.delete(key + "_headers");
-    } catch (e) {
-      // ignore
-    }
+    } catch (e) {}
   }
   moduleLocalCache.delete(key);
   moduleLocalCache.delete(key + "_headers");
@@ -368,7 +358,6 @@ async function cacheDelete(env, key) {
 
 // --- Request handlers ---
 async function handleSubRequest(request, url, backend, env) {
-  // Greedy extraction of url param to avoid truncation by internal '&'
   const targetUrl = (function getFullUrl(requestUrl) {
     const u = new URL(requestUrl);
     const search = u.search;
@@ -403,7 +392,6 @@ async function handleSubRequest(request, url, backend, env) {
   })(request.url);
 
   if (!targetUrl) {
-    // fallback: proxy directly to backend /sub
     const backendBase = backend.replace(/(https?:\/\/[^/]+).*$/, "$1");
     const backendUrl = `${backendBase}/sub${url.search}`;
     try {
@@ -470,7 +458,6 @@ async function handleSubRequest(request, url, backend, env) {
         obfuscatedData = replaceYAMLContent(plaintextData, replacements);
       }
 
-      // store obfuscated content in KV or module cache
       await cachePut(env, key, obfuscatedData, responseHeaders);
       keys.push(key);
       replacedURIs.push(`${host}/${subInternalDir}/${key}`);
@@ -478,11 +465,9 @@ async function handleSubRequest(request, url, backend, env) {
   }
 
   if (replacedURIs.length === 0) {
-    // ensure cleanup (no keys to delete but keep consistent behavior)
     return new Response("No valid nodes found", { status: 400 });
   }
 
-  // Build backend URL with replaced internal URLs
   const newUrl = replacedURIs.join("|");
   const incomingParams = new URL(request.url).searchParams;
   const originalParams = new URLSearchParams();
@@ -500,7 +485,6 @@ async function handleSubRequest(request, url, backend, env) {
   const backendBase = backend.replace(/(https?:\/\/[^/]+).*$/, "$1");
   const backendUrl = `${backendBase}/sub?${originalParams.toString()}`;
 
-  // Whether to keep KV entries for debugging (do not delete keys if true)
   const KEEP_KV_FOR_DEBUG = (env.KEEP_KV_FOR_DEBUG === "true" || env.KEEP_KV_FOR_DEBUG === true);
 
   try {
@@ -513,7 +497,6 @@ async function handleSubRequest(request, url, backend, env) {
 
     let content = await response.text();
 
-    // Recovery: replace obfuscated placeholders back to original using replacements map
     if (Object.keys(replacements).length > 0) {
       const recoveryRegex = new RegExp(Object.keys(replacements).map(escapeRegExp).join("|"), "g");
       const target = url.searchParams.get("target");
@@ -541,18 +524,15 @@ async function handleSubRequest(request, url, backend, env) {
   } catch (e) {
     return new Response("Error: " + e.message, { status: 500 });
   } finally {
-    // --- Cleanup: always attempt to delete keys unless KEEP_KV_FOR_DEBUG is true ---
     if (!KEEP_KV_FOR_DEBUG) {
       for (const k of keys) {
         try {
           await cacheDelete(env, k);
         } catch (err) {
-          // log and continue
           console.error("cleanup error for key", k, err);
         }
       }
     } else {
-      // In debug mode we keep KV entries to allow inspection; still clear moduleLocalCache entries
       for (const k of keys) {
         moduleLocalCache.delete(k);
         moduleLocalCache.delete(k + "_headers");
@@ -585,12 +565,10 @@ export async function onRequest(context) {
 
   const BACKEND = env.BACKEND_API_URL || DEFAULT_BACKEND;
 
-  // Internal temporary subscription endpoint (must be checked first)
   if (url.pathname.includes("/sub/internal/") || url.pathname.includes("/internal/")) {
     const pathSegments = url.pathname.split("/").filter(s => s);
     const key = pathSegments[pathSegments.length - 1];
 
-    // Try moduleLocalCache first, then KV if bound
     let content = moduleLocalCache.get(key);
     let headersJson = moduleLocalCache.get(key + "_headers");
 
@@ -610,16 +588,13 @@ export async function onRequest(context) {
     return new Response(content, { headers });
   }
 
-  // Subscription conversion endpoint
   if (url.pathname === "/sub" || url.pathname.startsWith("/sub")) {
     return await handleSubRequest(request, url, BACKEND, env);
   }
 
-  // Version endpoint
   if (url.pathname === "/version") {
     return await handleVersionRequest(BACKEND);
   }
 
-  // Other requests: let Pages serve static assets / next handler
   return await context.next();
 }
