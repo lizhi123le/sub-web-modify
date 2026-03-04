@@ -317,10 +317,12 @@ async function cachePut(env, key, value, headers) {
       console.error("KV put error", e);
       moduleLocalCache.set(key, value);
       if (headers) moduleLocalCache.set(key + "_headers", JSON.stringify(headers));
+      setTimeout(() => { moduleLocalCache.delete(key); moduleLocalCache.delete(key + "_headers"); }, 720000);
     }
   } else {
     moduleLocalCache.set(key, value);
     if (headers) moduleLocalCache.set(key + "_headers", JSON.stringify(headers));
+    setTimeout(() => { moduleLocalCache.delete(key); moduleLocalCache.delete(key + "_headers"); }, 720000);
   }
 }
 
@@ -331,6 +333,7 @@ async function cacheGet(env, key) {
       const v = await env.SUB_CACHE.get(key);
       if (v !== null) {
         moduleLocalCache.set(key, v);
+        setTimeout(() => { moduleLocalCache.delete(key); moduleLocalCache.delete(key + "_headers"); }, 720000);
         return v;
       }
     } catch (e) {
