@@ -500,6 +500,29 @@ async function handleSubRequest(request, url, backend, env) {
 
     let content = await response.text();
 
+    // Replace backend domains with current host dynamically (similar to _worker.js)
+    try {
+      const backendHost = new URL(backend).host;
+      const backendRegex = new RegExp(escapeRegExp(backendHost), 'g');
+      const replaceDomains = (str) => {
+        return str
+          .replace(new RegExp(`https://${escapeRegExp(backendHost)}`, 'g'), host)
+          .replace(backendRegex, url.host)
+          .replace(/http:\/\/127\.0\.0\.1:25500/g, host)
+          .replace(/127\.0\.0\.1:25500/g, url.host);
+      };
+      
+      const parsedContext = parseData(content);
+      if (parsedContext.format === 'base64') {
+        const replaced = replaceDomains(parsedContext.data);
+        content = utf8ToBase64(replaced);
+      } else {
+        content = replaceDomains(content);
+      }
+    } catch (e) {
+      console.error('Domain replace error:', e);
+    }
+
     if (Object.keys(replacements).length > 0) {
       const recoveryRegex = new RegExp(Object.keys(replacements).map(escapeRegExp).join("|"), "g");
       const target = url.searchParams.get("target");
