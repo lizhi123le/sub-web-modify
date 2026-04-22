@@ -419,8 +419,10 @@ async function handleSubRequest(request, url, backend, env) {
   const keys = [];
 
   const urlParts = targetUrl.split("|").filter((p) => p.trim() !== "");
+  let lastYieldTime = Date.now();
 
   for (const part of urlParts) {
+    if (Date.now() - lastYieldTime > 5) { await new Promise(r => setTimeout(r, 0)); lastYieldTime = Date.now(); }
     const key = generateRandomStr(16);
     let plaintextData = "";
     let responseHeaders = {};
@@ -453,6 +455,7 @@ async function handleSubRequest(request, url, backend, env) {
         const links = parsed.data.split(/\r?\n/).filter(l => l.trim());
         const newLinks = [];
         for (const link of links) {
+          if (Date.now() - lastYieldTime > 5) { await new Promise(r => setTimeout(r, 0)); lastYieldTime = Date.now(); }
           const nl = replaceInUri(link, replacements, false);
           newLinks.push(nl || link);
         }
@@ -526,11 +529,17 @@ async function handleSubRequest(request, url, backend, env) {
     if (Object.keys(replacements).length > 0) {
       const recoveryRegex = new RegExp(Object.keys(replacements).map(escapeRegExp).join("|"), "g");
       const target = url.searchParams.get("target");
+      let lastYieldTime = Date.now();
       try {
         const decoded = urlSafeBase64Decode(content);
         if (decoded && (decoded.includes("://") || decoded.includes("proxies:") || decoded.includes("port:"))) {
-          const recovered = decoded.replace(recoveryRegex, (m) => replacements[m] || m);
-          content = (target === "base64") ? utf8ToBase64(recovered) : recovered;
+          const lines = decoded.split(/\r?\n/);
+          const recovered = [];
+          for (const line of lines) {
+            if (Date.now() - lastYieldTime > 5) { await new Promise(r => setTimeout(r, 0)); lastYieldTime = Date.now(); }
+            recovered.push(line.replace(recoveryRegex, (m) => replacements[m] || m));
+          }
+          content = (target === "base64") ? utf8ToBase64(recovered.join("\r\n")) : recovered.join("\r\n");
         } else {
           content = content.replace(recoveryRegex, (m) => replacements[m] || m);
         }
@@ -550,8 +559,10 @@ async function handleSubRequest(request, url, backend, env) {
   } catch (e) {
     return new Response("Error: " + e.message, { status: 500 });
   } finally {
+    let lastYieldTime = Date.now();
     if (!KEEP_KV_FOR_DEBUG) {
       for (const k of keys) {
+        if (Date.now() - lastYieldTime > 5) { await new Promise(r => setTimeout(r, 0)); lastYieldTime = Date.now(); }
         try {
           await cacheDelete(env, k);
         } catch (err) {
@@ -560,6 +571,7 @@ async function handleSubRequest(request, url, backend, env) {
       }
     } else {
       for (const k of keys) {
+        if (Date.now() - lastYieldTime > 5) { await new Promise(r => setTimeout(r, 0)); lastYieldTime = Date.now(); }
         moduleLocalCache.delete(k);
         moduleLocalCache.delete(k + "_headers");
       }
