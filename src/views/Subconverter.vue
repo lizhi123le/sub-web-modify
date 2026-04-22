@@ -794,8 +794,8 @@ export default {
         emoji: true,
         nodeList: false,
         extraset: false,
-        tls13: false,
-        udp: false,
+        tls13: true,
+        udp: true,
         xudp: false,
         tfo: false,
         sort: false,
@@ -810,7 +810,7 @@ export default {
             doh: false // dns 查询是否使用 DoH
           },
           clash: {
-            doh: false
+            doh: true
           },
           singbox: {
             ipv6: false
